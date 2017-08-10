@@ -79,16 +79,14 @@ public:
 	}
 	bool OpenCell(const Location& loc)
 	{
-		if (table(loc).flag)
+		if (table(loc).state == CellState::Flagged || table(loc).state == CellState::Open)
 			return true;
 		if (!minesInitialized)
 		{
 			SetMines(loc);
 			minesInitialized = true;
 		}
-		if (table(loc).open)
-			return true;
-		table(loc).open = true;
+		table(loc).state = CellState::Open;
 		if (table(loc).mine)
 		{
 			OpenAllMines();
@@ -101,13 +99,13 @@ public:
 	}
 	bool OpenCellsWithCurrentMineIndicator(const Location& loc)
 	{
-		if (!table(loc).open)
+		if (table(loc).state != CellState::Open)
 			return true;
 		size_t allArounds = 0;
 		std::vector<Location> locs;
 		table.Around(loc, [this, &allArounds, &locs](const Location& loc)
 		{
-			if (!table(loc).flag)
+			if (table(loc).state != CellState::Flagged)
 				locs.emplace_back(loc);
 			allArounds++;
 		});
@@ -122,15 +120,25 @@ public:
 	}
 	void SwitchFlag(const Location& loc)
 	{
-		if (!table(loc).open)
-			table(loc).flag = !table(loc).flag;
+		if (table(loc).state == CellState::Closed)
+			table(loc).state = CellState::Flagged;
+		else if (table(loc).state == CellState::Flagged)
+			table(loc).state = CellState::Closed;
 	}
-	void SetCellPressedState(const Location& loc, bool pressed)
+	void SetCellOpeningState(const Location& loc, bool opening)
 	{
-		table.Around(loc, [this, pressed](const Location& loc)
+		table.Around(loc, [this, opening](const Location& loc)
 		{
-			if (!table(loc).flag)
-				table(loc).pressed = pressed;
+			if (opening)
+			{
+				if (table(loc).state == CellState::Closed)
+					table(loc).state = CellState::Opening;
+			}
+			else
+			{
+				if (table(loc).state == CellState::Opening)
+					table(loc).state = CellState::Closed;
+			}
 		});
 	}
 	bool IsValidLocation(const Location& loc) const { return table.IsValidLocation(loc); }
@@ -138,7 +146,7 @@ public:
 	{
 		for (Location loc; IsValidLocation(loc); loc = table.GetNextLocation(loc))
 		{
-			if (!table(loc).mine && !table(loc).open)
+			if (!table(loc).mine && table(loc).state != CellState::Open)
 				return false;
 		}
 		return true;
@@ -148,39 +156,42 @@ public:
 		ptrdiff_t allMines = static_cast<ptrdiff_t>(mines);
 		for (Location loc; IsValidLocation(loc); loc = table.GetNextLocation(loc))
 		{
-			if (table(loc).flag)
+			if (table(loc).state == CellState::Flagged)
 				--allMines;
 		}
 		return allMines;
 	}
 
 private:
+	enum class CellState : uint8_t
+	{
+		Closed = 0,
+		Flagged = 1,
+		Opening = 2,
+		Open = 3,
+	};
+
 	class Cell
 	{
 	public:
-		Cell() : mines(0), open(false), mine(false), flag(false), pressed(false) { }
-		uint8_t mines : 4;
-		uint8_t open : 1;
+		Cell() : mines(0), mine(false), state(CellState::Closed) { }
+		uint8_t mines : 5;
 		uint8_t mine : 1;
-		uint8_t flag : 1;
-		uint8_t pressed : 1;
+		CellState state : 2;
 
 		void Render(OutputConsole& output) const
 		{
-			if (!open)
+			if (state == CellState::Flagged)
 			{
-				if (!flag)
-				{
-					output.SetTextAttribute({ pressed ? ConsoleColor::Black : ConsoleColor::Gray, DefaultBackground });
-					output.Write(L"■");
-					output.SetTextAttribute({ DefaultForeground, DefaultBackground });
-				}
-				else
-				{
-					output.SetTextAttribute({ ConsoleColor::Red, DefaultBackground });
-					output.Write(L"★");
-					output.SetTextAttribute({ DefaultForeground, DefaultBackground });
-				}
+				output.SetTextAttribute({ ConsoleColor::Red, DefaultBackground });
+				output.Write(L"★");
+				output.SetTextAttribute({ DefaultForeground, DefaultBackground });
+			}
+			else if (state != CellState::Open)
+			{
+				output.SetTextAttribute({ state == CellState::Opening ? ConsoleColor::Black : ConsoleColor::Gray, DefaultBackground });
+				output.Write(L"■");
+				output.SetTextAttribute({ DefaultForeground, DefaultBackground });
 			}
 			else if (mine)
 				output.Write(L"●");
@@ -281,7 +292,7 @@ private:
 		for (Location loc; table.IsValidLocation(loc); loc = table.GetNextLocation(loc))
 		{
 			if (table(loc).mine)
-				table(loc).open = true;
+				table(loc).state = CellState::Open;
 		}
 	}
 };
@@ -290,7 +301,7 @@ bool PlayGame(size_t width, size_t height, size_t mines, InputConsole& input, Ou
 {
 	Game game(width, height, mines);
 	std::optional<MouseButtonState> prevButtonState;
-	std::optional<Location> pressedMarkPos;
+	std::optional<Location> openingCenterPos;
 	bool renderRequested = true;
 	bool canOpenCell = false;
 	bool res = true;
@@ -315,10 +326,10 @@ bool PlayGame(size_t width, size_t height, size_t mines, InputConsole& input, Ou
 		{
 			if (prevButtonState->GetLeft() && prevButtonState->GetRight() && (!ev->ButtonState.GetLeft() || !ev->ButtonState.GetRight()))
 			{
-				if (pressedMarkPos)
+				if (openingCenterPos)
 				{
-					game.SetCellPressedState(*pressedMarkPos, false);
-					pressedMarkPos = std::nullopt;
+					game.SetCellOpeningState(*openingCenterPos, false);
+					openingCenterPos = std::nullopt;
 				}
 				res = game.OpenCellsWithCurrentMineIndicator(loc);
 				renderRequested = true;
@@ -340,15 +351,15 @@ bool PlayGame(size_t width, size_t height, size_t mines, InputConsole& input, Ou
 				canOpenCell = true;
 			if ((!prevButtonState->GetLeft() || !prevButtonState->GetRight()) && ev->ButtonState.GetLeft() && ev->ButtonState.GetRight())
 			{
-				pressedMarkPos = loc;
-				game.SetCellPressedState(loc, true);
+				openingCenterPos = loc;
+				game.SetCellOpeningState(loc, true);
 				renderRequested = true;
 			}
-			if (ev->Kind == MouseEventKind::Moved && pressedMarkPos && *pressedMarkPos != loc)
+			if (ev->Kind == MouseEventKind::Moved && openingCenterPos && *openingCenterPos != loc)
 			{
-				game.SetCellPressedState(*pressedMarkPos, false);
-				pressedMarkPos = loc;
-				game.SetCellPressedState(loc, true);
+				game.SetCellOpeningState(*openingCenterPos, false);
+				openingCenterPos = loc;
+				game.SetCellOpeningState(loc, true);
 				renderRequested = true;
 			}
 		}
