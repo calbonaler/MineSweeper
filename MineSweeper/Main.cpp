@@ -79,37 +79,37 @@ public:
 	}
 	bool OpenCell(const Location& loc)
 	{
-		if (table(loc).state == CellState::Flagged || table(loc).state == CellState::Open)
+		if (table(loc).State == CellState::Flagged || table(loc).State == CellState::Open)
 			return true;
 		if (!minesInitialized)
 		{
 			SetMines(loc);
 			minesInitialized = true;
 		}
-		table(loc).state = CellState::Open;
-		if (table(loc).mine)
+		table(loc).State = CellState::Open;
+		if (table(loc).HasMine)
 		{
 			OpenAllMines();
 			return false;
 		}
-		if (table(loc).mines > 0)
+		if (table(loc).AroundMines > 0)
 			return true;
 		table.Around(loc, [this](const Location& loc) { OpenCell(loc); });
 		return true;
 	}
 	bool OpenCellsWithCurrentMineIndicator(const Location& loc)
 	{
-		if (table(loc).state != CellState::Open)
+		if (table(loc).State != CellState::Open)
 			return true;
 		size_t allArounds = 0;
 		std::vector<Location> locs;
 		table.Around(loc, [this, &allArounds, &locs](const Location& loc)
 		{
-			if (table(loc).state != CellState::Flagged)
+			if (table(loc).State != CellState::Flagged)
 				locs.emplace_back(loc);
 			allArounds++;
 		});
-		if (locs.size() != allArounds - table(loc).mines)
+		if (locs.size() != allArounds - table(loc).AroundMines)
 			return true;
 		for (const auto& it : locs)
 		{
@@ -118,12 +118,12 @@ public:
 		}
 		return true;
 	}
-	void SwitchFlag(const Location& loc)
+	void SwitchFlaggedState(const Location& loc)
 	{
-		if (table(loc).state == CellState::Closed)
-			table(loc).state = CellState::Flagged;
-		else if (table(loc).state == CellState::Flagged)
-			table(loc).state = CellState::Closed;
+		if (table(loc).State == CellState::Closed)
+			table(loc).State = CellState::Flagged;
+		else if (table(loc).State == CellState::Flagged)
+			table(loc).State = CellState::Closed;
 	}
 	void SetCellOpeningState(const Location& loc, bool opening)
 	{
@@ -131,13 +131,13 @@ public:
 		{
 			if (opening)
 			{
-				if (table(loc).state == CellState::Closed)
-					table(loc).state = CellState::Opening;
+				if (table(loc).State == CellState::Closed)
+					table(loc).State = CellState::Opening;
 			}
 			else
 			{
-				if (table(loc).state == CellState::Opening)
-					table(loc).state = CellState::Closed;
+				if (table(loc).State == CellState::Opening)
+					table(loc).State = CellState::Closed;
 			}
 		});
 	}
@@ -146,17 +146,17 @@ public:
 	{
 		for (Location loc; IsValidLocation(loc); loc = table.GetNextLocation(loc))
 		{
-			if (!table(loc).mine && table(loc).state != CellState::Open)
+			if (!table(loc).HasMine && table(loc).State != CellState::Open)
 				return false;
 		}
 		return true;
 	}
-	ptrdiff_t CountUnflagedMines() const
+	ptrdiff_t CountUnflaggedMines() const
 	{
 		ptrdiff_t allMines = static_cast<ptrdiff_t>(mines);
 		for (Location loc; IsValidLocation(loc); loc = table.GetNextLocation(loc))
 		{
-			if (table(loc).state == CellState::Flagged)
+			if (table(loc).State == CellState::Flagged)
 				--allMines;
 		}
 		return allMines;
@@ -174,33 +174,33 @@ private:
 	class Cell
 	{
 	public:
-		Cell() : mines(0), mine(false), state(CellState::Closed) { }
-		uint8_t mines : 5;
-		uint8_t mine : 1;
-		CellState state : 2;
+		Cell() : AroundMines(0), HasMine(false), State(CellState::Closed) { }
+		uint8_t AroundMines : 5;
+		uint8_t HasMine : 1;
+		CellState State : 2;
 
 		void Render(OutputConsole& output) const
 		{
-			if (state == CellState::Flagged)
+			if (State == CellState::Flagged)
 			{
 				output.SetTextAttribute({ ConsoleColor::Red, DefaultBackground });
 				output.Write(L"★");
 				output.SetTextAttribute({ DefaultForeground, DefaultBackground });
 			}
-			else if (state != CellState::Open)
+			else if (State != CellState::Open)
 			{
-				output.SetTextAttribute({ state == CellState::Opening ? ConsoleColor::Black : ConsoleColor::Gray, DefaultBackground });
+				output.SetTextAttribute({ State == CellState::Opening ? ConsoleColor::Black : ConsoleColor::Gray, DefaultBackground });
 				output.Write(L"■");
 				output.SetTextAttribute({ DefaultForeground, DefaultBackground });
 			}
-			else if (mine)
+			else if (HasMine)
 				output.Write(L"●");
-			else if (mines == 0)
+			else if (AroundMines == 0)
 				output.Write(L"  ");
 			else
 			{
-				output.SetTextAttribute({ GetColor(mines), DefaultBackground });
-				auto ch = static_cast<WCHAR>(L'０' + mines);
+				output.SetTextAttribute({ GetColor(AroundMines), DefaultBackground });
+				auto ch = static_cast<WCHAR>(L'０' + AroundMines);
 				output.Write(&ch, 1);
 				output.SetTextAttribute({ DefaultForeground, DefaultBackground });
 			}
@@ -273,26 +273,26 @@ private:
 		for (size_t i = 0; i < mines; )
 		{
 			auto loc = table.GenerateLocation(rng);
-			if (without == loc || table(loc).mine)
+			if (without == loc || table(loc).HasMine)
 				continue;
-			table(loc).mine = true;
+			table(loc).HasMine = true;
 			i++;
 		}
 		for (Location loc; IsValidLocation(loc); loc = table.GetNextLocation(loc))
-			table(loc).mines = CountMines(loc);
+			table(loc).AroundMines = CountMines(loc);
 	}
 	int CountMines(const Location& center) const
 	{
 		int mines = 0;
-		table.Around(center, [this, &mines](const Location& moved) { if (table(moved).mine) mines++; });
+		table.Around(center, [this, &mines](const Location& moved) { if (table(moved).HasMine) mines++; });
 		return mines;
 	}
 	void OpenAllMines()
 	{
 		for (Location loc; table.IsValidLocation(loc); loc = table.GetNextLocation(loc))
 		{
-			if (table(loc).mine)
-				table(loc).state = CellState::Open;
+			if (table(loc).HasMine)
+				table(loc).State = CellState::Open;
 		}
 	}
 };
@@ -312,7 +312,7 @@ bool PlayGame(size_t width, size_t height, size_t mines, InputConsole& input, Ou
 			output.SetCursorPosition({ 0, 0 });
 			game.Render(output);
 			output.FillOutput(L' ', bufferSize.Width, output.GetCursorPosition());
-			output.Write(L"残り地雷数: " + std::to_wstring(game.CountUnflagedMines()));
+			output.Write(L"残り地雷数: " + std::to_wstring(game.CountUnflaggedMines()));
 			if (!res)
 				return false;
 			if (game.HasCompleted())
@@ -343,7 +343,7 @@ bool PlayGame(size_t width, size_t height, size_t mines, InputConsole& input, Ou
 			}
 			if (!prevButtonState->GetLeft() && !prevButtonState->GetRight() && !ev->ButtonState.GetLeft() && ev->ButtonState.GetRight())
 			{
-				game.SwitchFlag(loc);
+				game.SwitchFlaggedState(loc);
 				res = true;
 				renderRequested = true;
 			}
