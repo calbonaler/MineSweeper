@@ -374,21 +374,25 @@ int main()
 	const auto initialAttribute = output.GetTextAttribute();
 	input.SetMode(input.GetMode() | ConsoleInputModes::EnableMouseInput);
 
+	bool enterConfiguration = true;
+	unsigned long width, height, mines;
 	while (true)
 	{
-		output.Write(L"幅: ");
-		auto width = std::stoul(input.Read());
-		output.Write(L"高さ: ");
-		auto height = std::stoul(input.Read());
-		unsigned long mines;
-		while (true)
+		if (enterConfiguration)
 		{
-			output.Write(L"地雷数: ");
-			mines = std::stoul(input.Read());
-			if (mines < width * height) break;
-			output.SetTextAttribute({ ConsoleColor::Red, initialAttribute.Background });
-			output.Write(L"地雷数は幅×高さよりも小さくなければなりません。\n");
-			output.SetTextAttribute(initialAttribute);
+			output.Write(L"幅: ");
+			width = std::stoul(input.Read());
+			output.Write(L"高さ: ");
+			height = std::stoul(input.Read());
+			while (true)
+			{
+				output.Write(L"地雷数: ");
+				mines = std::stoul(input.Read());
+				if (mines < width * height) break;
+				output.SetTextAttribute({ ConsoleColor::Red, initialAttribute.Background });
+				output.Write(L"地雷数は幅×高さよりも小さくなければなりません。\n");
+				output.SetTextAttribute(initialAttribute);
+			}
 		}
 
 		output.SetCursorPosition({ 0, 0 });
@@ -427,13 +431,22 @@ int main()
 		}
 		output.SetTextAttribute(initialAttribute);
 
-		output.Write(L"もう一度挑戦する場合は [R] を、終了する場合は [Q] を押してください\n");
+		output.Write(L"もう一度プレイする場合は [R] を、設定を変更してプレイする場合は [Shift] + [R] を、終了する場合は [Q] を押してください\n");
 		while (true)
 		{
 			auto ev = input.ReadInput().AsKeyEvent();
 			if (!ev) continue;
-			if (ev->Char == L'R' || ev->Char == 'r') break;
-			if (ev->Char == L'Q' || ev->Char == 'q') goto Exit;
+			if (ev->Char == 'r')
+			{
+				enterConfiguration = false;
+				break;
+			}
+			if (ev->Char == 'R')
+			{
+				enterConfiguration = true;
+				break;
+			}
+			if (ev->Char == 'q') goto Exit;
 		}
 	}
 
