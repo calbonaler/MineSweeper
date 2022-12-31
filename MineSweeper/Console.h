@@ -1,8 +1,8 @@
 #pragma once
 
-#include <array>
 #include <string>
 #include <optional>
+#include <variant>
 #include "Utility.h"
 
 enum class ConsoleColor : uint8_t
@@ -29,52 +29,52 @@ constexpr uint8_t ConsoleColorMask = static_cast<uint8_t>(ConsoleColor::White);
 
 struct ConsoleCharacterAttribute
 {
-	ConsoleCharacterAttribute() { }
-	ConsoleCharacterAttribute(ConsoleColor foreground, ConsoleColor background) : Foreground(foreground), Background(background) { }
-	explicit ConsoleCharacterAttribute(uint16_t value) : Foreground(static_cast<ConsoleColor>(value & ConsoleColorMask)), Background(static_cast<ConsoleColor>((value << 4) & ConsoleColorMask)) { }
+	constexpr ConsoleCharacterAttribute() : Foreground(ConsoleColor::Black), Background(ConsoleColor::Black) { }
+	constexpr ConsoleCharacterAttribute(ConsoleColor foreground, ConsoleColor background) : Foreground(foreground), Background(background) { }
+	constexpr explicit ConsoleCharacterAttribute(uint16_t value) : Foreground(static_cast<ConsoleColor>(value & ConsoleColorMask)), Background(static_cast<ConsoleColor>((value << 4) & ConsoleColorMask)) { }
 
 	ConsoleColor Foreground;
 	ConsoleColor Background;
 
-	explicit operator uint16_t() const { return static_cast<uint16_t>(Foreground) | static_cast<uint16_t>(Background) << 4; }
+	constexpr explicit operator uint16_t() const { return static_cast<uint16_t>(Foreground) | static_cast<uint16_t>(Background) << 4; }
 };
 
 struct ConsoleCoordinate
 {
-	ConsoleCoordinate() : X(0), Y(0) { }
-	ConsoleCoordinate(int16_t x, int16_t y) : X(x), Y(y) { }
-	explicit ConsoleCoordinate(COORD value) : X(value.X), Y(value.Y) { }
+	constexpr ConsoleCoordinate() : X(0), Y(0) { }
+	constexpr ConsoleCoordinate(int16_t x, int16_t y) : X(x), Y(y) { }
+	constexpr explicit ConsoleCoordinate(COORD value) : X(value.X), Y(value.Y) { }
 
 	int16_t X;
 	int16_t Y;
 
-	explicit operator COORD() const { return { X, Y }; }
+	constexpr explicit operator COORD() const { return { X, Y }; }
 };
 
 struct ConsoleSize
 {
-	ConsoleSize() : Width(0), Height(0) { }
-	ConsoleSize(int16_t width, int16_t height) : Width(width), Height(height) { }
-	explicit ConsoleSize(COORD value) : Width(value.X), Height(value.Y) { }
+	constexpr ConsoleSize() : Width(0), Height(0) { }
+	constexpr ConsoleSize(int16_t width, int16_t height) : Width(width), Height(height) { }
+	constexpr explicit ConsoleSize(COORD value) : Width(value.X), Height(value.Y) { }
 
 	int16_t Width;
 	int16_t Height;
 
-	explicit operator COORD() const { return { Width, Height }; }
+	constexpr explicit operator COORD() const { return { Width, Height }; }
 };
 
 struct ConsoleRect
 {
-	ConsoleRect() { }
-	ConsoleRect(int16_t left, int16_t top, int16_t right, int16_t bottom) : Left(left), Top(top), Right(right), Bottom(bottom) { }
-	explicit ConsoleRect(SMALL_RECT value) : Left(value.Left), Top(value.Top), Right(value.Right), Bottom(value.Bottom) { }
+	constexpr ConsoleRect() : Left(0), Top(0), Right(0), Bottom(0) { }
+	constexpr ConsoleRect(int16_t left, int16_t top, int16_t right, int16_t bottom) : Left(left), Top(top), Right(right), Bottom(bottom) { }
+	constexpr explicit ConsoleRect(SMALL_RECT value) : Left(value.Left), Top(value.Top), Right(value.Right), Bottom(value.Bottom) { }
 
 	int16_t Left;
 	int16_t Top;
 	int16_t Right;
 	int16_t Bottom;
 
-	explicit operator SMALL_RECT() const { return { Left, Top, Right, Bottom }; }
+	constexpr explicit operator SMALL_RECT() const { return { Left, Top, Right, Bottom }; }
 };
 
 enum class FontFamilyType : uint8_t 
@@ -89,8 +89,8 @@ enum class FontFamilyType : uint8_t
 
 struct ConsoleFontInfo
 {
-	ConsoleFontInfo() : Index(0), PitchAndFamily(0), Weight(0) { }
-	explicit ConsoleFontInfo(const CONSOLE_FONT_INFOEX& value) : Index(value.nFont), Size(value.dwFontSize), PitchAndFamily(value.FontFamily), Weight(value.FontWeight), FaceName(value.FaceName) { }
+	constexpr ConsoleFontInfo() : Index(0), PitchAndFamily(0), Weight(0) { }
+	constexpr explicit ConsoleFontInfo(const CONSOLE_FONT_INFOEX& value) : Index(value.nFont), Size(value.dwFontSize), PitchAndFamily(value.FontFamily), Weight(value.FontWeight), FaceName(value.FaceName) { }
 
 	uint32_t Index;
 	ConsoleSize Size;
@@ -98,36 +98,37 @@ struct ConsoleFontInfo
 	uint32_t Weight;
 	std::wstring FaceName;
 
-	bool GetIsFixedPitch() const { return GetFlag(PitchAndFamily, TMPF_FIXED_PITCH); }
-	void SetIsFixedPitch(bool value) { SetFlag(PitchAndFamily, TMPF_FIXED_PITCH, value); }
-	bool GetIsVector() const { GetFlag(PitchAndFamily, TMPF_VECTOR); }
-	void SetIsVector(bool value) { SetFlag(PitchAndFamily, TMPF_VECTOR, value); }
-	bool GetIsTrueType() const { GetFlag(PitchAndFamily, TMPF_TRUETYPE); }
-	void SetIsTrueType(bool value) { SetFlag(PitchAndFamily, TMPF_TRUETYPE, value); }
-	bool GetIsDevice() const { GetFlag(PitchAndFamily, TMPF_DEVICE); }
-	void SetIsDevice(bool value) { SetFlag(PitchAndFamily, TMPF_DEVICE, value); }
-	FontFamilyType GetFamilyType() const { return static_cast<FontFamilyType>(PitchAndFamily >> 4); }
-	void SetFamilyType(FontFamilyType value) { PitchAndFamily = PitchAndFamily & 0xF | static_cast<uint32_t>(value) << 4; }
+	constexpr bool GetIsFixedPitch() const { return GetFlag(PitchAndFamily, TMPF_FIXED_PITCH); }
+	constexpr void SetIsFixedPitch(bool value) { SetFlag(PitchAndFamily, TMPF_FIXED_PITCH, value); }
+	constexpr bool GetIsVector() const { return GetFlag(PitchAndFamily, TMPF_VECTOR); }
+	constexpr void SetIsVector(bool value) { SetFlag(PitchAndFamily, TMPF_VECTOR, value); }
+	constexpr bool GetIsTrueType() const { return GetFlag(PitchAndFamily, TMPF_TRUETYPE); }
+	constexpr void SetIsTrueType(bool value) { SetFlag(PitchAndFamily, TMPF_TRUETYPE, value); }
+	constexpr bool GetIsDevice() const { return GetFlag(PitchAndFamily, TMPF_DEVICE); }
+	constexpr void SetIsDevice(bool value) { SetFlag(PitchAndFamily, TMPF_DEVICE, value); }
+	constexpr FontFamilyType GetFamilyType() const { return static_cast<FontFamilyType>(PitchAndFamily >> 4); }
+	constexpr void SetFamilyType(FontFamilyType value) { PitchAndFamily = PitchAndFamily & 0xF | static_cast<uint32_t>(value) << 4; }
 
-	explicit operator CONSOLE_FONT_INFOEX() const
+	constexpr explicit operator CONSOLE_FONT_INFOEX() const
 	{
 		CONSOLE_FONT_INFOEX info;
 		CopyTo(info);
 		return info;
 	}
-	void CopyTo(CONSOLE_FONT_INFOEX& info) const
+	constexpr void CopyTo(CONSOLE_FONT_INFOEX& info) const
 	{
 		info.cbSize = sizeof(CONSOLE_FONT_INFOEX);
 		info.nFont = Index;
 		info.dwFontSize = static_cast<COORD>(Size);
 		info.FontFamily = PitchAndFamily;
 		info.FontWeight = Weight;
-		wcscpy_s(info.FaceName, FaceName.c_str());
+		auto size = FaceName.copy(info.FaceName, sizeof(info.FaceName) / sizeof(info.FaceName[0]) - 1);
+		info.FaceName[size] = L'\0';
 	}
 
 private:
-	template <typename T, typename TValue> static inline bool GetFlag(T storage, TValue flag) { return storage & static_cast<T>(flag); }
-	template <typename T, typename TValue> static inline void SetFlag(T& storage, TValue flag, bool set)
+	template <typename T, typename TValue> constexpr static bool GetFlag(T storage, TValue flag) { return storage & static_cast<T>(flag); }
+	template <typename T, typename TValue> constexpr static void SetFlag(T& storage, TValue flag, bool set)
 	{
 		storage &= ~static_cast<T>(flag);
 		if (set) storage |= static_cast<T>(flag);
@@ -195,8 +196,8 @@ ALLOW_ENUM_FLAG_OPERATIONS(ConsoleControlKeyStates)
 struct KeyEventRecord
 {
 public:
-	KeyEventRecord() : IsKeyDown(false), RepeatCount(0), VirtualKeyCode(0), VirtualScanCode(0), Char(L'\0'), ControlKeyState(ConsoleControlKeyStates::None) { }
-	KeyEventRecord(const KEY_EVENT_RECORD& record) :
+	constexpr KeyEventRecord() : IsKeyDown(false), RepeatCount(0), VirtualKeyCode(0), VirtualScanCode(0), Char(L'\0'), ControlKeyState(ConsoleControlKeyStates::None) { }
+	constexpr KeyEventRecord(const KEY_EVENT_RECORD& record) :
 		IsKeyDown(record.bKeyDown),
 		RepeatCount(record.wRepeatCount),
 		VirtualKeyCode(record.wVirtualKeyCode),
@@ -223,56 +224,56 @@ enum class MouseEventKind : uint32_t
 
 struct MouseButtonState
 {
-	MouseButtonState() : m_Value(0) { }
-	explicit MouseButtonState(uint16_t value) : m_Value(value) { }
-	bool GetLeft(uint8_t index = 0) const
+	constexpr MouseButtonState() : m_Value(0) { }
+	constexpr explicit MouseButtonState(uint16_t value) : m_Value(value) { }
+	constexpr bool GetLeft(uint8_t index = 0) const
 	{
 		CheckIndex(index);
 		return At(index);
 	}
-	bool GetRight(uint8_t index = 0) const
+	constexpr bool GetRight(uint8_t index = 0) const
 	{
 		CheckIndex(index);
 		return At(15 - index);
 	}
-	bool operator ==(const MouseButtonState& right) const { return m_Value == right.m_Value; }
-	bool operator !=(const MouseButtonState& right) const { return !(*this == right); }
-	operator bool() const { return m_Value != 0; }
+	constexpr bool operator ==(const MouseButtonState& right) const { return m_Value == right.m_Value; }
+	constexpr bool operator !=(const MouseButtonState& right) const { return !(*this == right); }
+	constexpr operator bool() const { return m_Value != 0; }
 
-	MouseButtonState& operator &=(const MouseButtonState& right)
+	constexpr MouseButtonState& operator &=(const MouseButtonState& right)
 	{
 		m_Value &= right.m_Value;
 		return *this;
 	}
-	MouseButtonState& operator ^=(const MouseButtonState& right)
+	constexpr MouseButtonState& operator ^=(const MouseButtonState& right)
 	{
 		m_Value ^= right.m_Value;
 		return *this;
 	}
-	MouseButtonState& operator |=(const MouseButtonState& right)
+	constexpr MouseButtonState& operator |=(const MouseButtonState& right)
 	{
 		m_Value |= right.m_Value;
 		return *this;
 	}
-	MouseButtonState& Flip()
+	constexpr MouseButtonState& Flip()
 	{
 		m_Value = ~m_Value;
 		return *this;
 	}
-	MouseButtonState operator &(const MouseButtonState& right) const { return MouseButtonState(m_Value & right.m_Value); }
-	MouseButtonState operator ^(const MouseButtonState& right) const { return MouseButtonState(m_Value ^ right.m_Value); }
-	MouseButtonState operator |(const MouseButtonState& right) const { return MouseButtonState(m_Value | right.m_Value); }
-	MouseButtonState operator ~() const { return MouseButtonState(~m_Value); }
+	constexpr MouseButtonState operator &(const MouseButtonState& right) const { return MouseButtonState(m_Value & right.m_Value); }
+	constexpr MouseButtonState operator ^(const MouseButtonState& right) const { return MouseButtonState(m_Value ^ right.m_Value); }
+	constexpr MouseButtonState operator |(const MouseButtonState& right) const { return MouseButtonState(m_Value | right.m_Value); }
+	constexpr MouseButtonState operator ~() const { return MouseButtonState(~m_Value); }
 
 private:
 	uint16_t m_Value;
 
-	void CheckIndex(uint8_t index) const
+	constexpr void CheckIndex(uint8_t index) const
 	{
 		if (index >= 16)
 			throw std::out_of_range("Index must be less than 16.");
 	}
-	bool At(uint8_t index) const
+	constexpr bool At(uint8_t index) const
 	{
 		if (index == 0)
 			return m_Value & 1u;
@@ -285,8 +286,8 @@ private:
 
 struct MouseEventRecord
 {
-	MouseEventRecord() : Location(), ButtonState(), Delta(0), ControlKeyState(ConsoleControlKeyStates::None), Kind(MouseEventKind::PressedOrReleased) { }
-	MouseEventRecord(const MOUSE_EVENT_RECORD& record) :
+	constexpr MouseEventRecord() : Location(), ButtonState(), Delta(0), ControlKeyState(ConsoleControlKeyStates::None), Kind(MouseEventKind::PressedOrReleased) { }
+	constexpr MouseEventRecord(const MOUSE_EVENT_RECORD& record) :
 		Location(record.dwMousePosition),
 		ButtonState(record.dwButtonState & 0xFFFF),
 		Delta(static_cast<int16_t>(record.dwButtonState >> 16)),
@@ -302,123 +303,44 @@ struct MouseEventRecord
 
 struct BufferEventRecord
 {
-	BufferEventRecord() : Size() { }
-	BufferEventRecord(const WINDOW_BUFFER_SIZE_RECORD& record) : Size(record.dwSize) { }
+	constexpr BufferEventRecord() : Size() { }
+	constexpr BufferEventRecord(const WINDOW_BUFFER_SIZE_RECORD& record) : Size(record.dwSize) { }
 
 	ConsoleSize Size;
 };
 
 struct MenuEventRecord
 {
-	MenuEventRecord() : CommandId(0) { }
-	MenuEventRecord(const MENU_EVENT_RECORD& record) : CommandId(record.dwCommandId) { }
+	constexpr MenuEventRecord() : CommandId(0) { }
+	constexpr MenuEventRecord(const MENU_EVENT_RECORD& record) : CommandId(record.dwCommandId) { }
 
 	uint32_t CommandId;
 };
 
 struct FocusEventRecord
 {
-	FocusEventRecord() : IsSetFocus(false) { }
-	FocusEventRecord(const FOCUS_EVENT_RECORD& record) : IsSetFocus(record.bSetFocus) { }
+	constexpr FocusEventRecord() : IsSetFocus(false) { }
+	constexpr FocusEventRecord(const FOCUS_EVENT_RECORD& record) : IsSetFocus(record.bSetFocus) { }
 
 	bool IsSetFocus;
 };
 
-enum class EventType : uint16_t
-{
-	None = 0,
-	Key = KEY_EVENT,
-	Mouse = MOUSE_EVENT,
-	Buffer = WINDOW_BUFFER_SIZE_EVENT,
-	Menu = MENU_EVENT,
-	Focus = FOCUS_EVENT,
-};
+using EventRecord = std::variant<std::monostate, KeyEventRecord, MouseEventRecord, BufferEventRecord, MenuEventRecord, FocusEventRecord>;
 
-struct EventRecord
+constexpr inline EventRecord CreateEventRecord(const INPUT_RECORD& record)
 {
-	EventRecord() : m_Type(EventType::None) { }
-	EventRecord(const EventRecord& source) { *this = source; }
-	EventRecord(const INPUT_RECORD& record) { *this = record; }
-	EventRecord& operator =(const EventRecord& source)
+	EventRecord eventRecord;
+	switch (record.EventType)
 	{
-		m_Type = source.m_Type;
-		switch (m_Type)
-		{
-		case EventType::Key:    new (&m_KeyEvent   ) KeyEventRecord   (source.m_KeyEvent   ); break;
-		case EventType::Mouse:  new (&m_MouseEvent ) MouseEventRecord (source.m_MouseEvent ); break;
-		case EventType::Buffer: new (&m_BufferEvent) BufferEventRecord(source.m_BufferEvent); break;
-		case EventType::Menu:   new (&m_MenuEvent  ) MenuEventRecord  (source.m_MenuEvent  ); break;
-		case EventType::Focus:  new (&m_FocusEvent ) FocusEventRecord (source.m_FocusEvent ); break;
-		}
-		return *this;
+	case KEY_EVENT               : eventRecord.emplace<KeyEventRecord   >(record.Event.KeyEvent             ); break;
+	case MOUSE_EVENT             : eventRecord.emplace<MouseEventRecord >(record.Event.MouseEvent           ); break;
+	case WINDOW_BUFFER_SIZE_EVENT: eventRecord.emplace<BufferEventRecord>(record.Event.WindowBufferSizeEvent); break;
+	case MENU_EVENT              : eventRecord.emplace<MenuEventRecord  >(record.Event.MenuEvent            ); break;
+	case FOCUS_EVENT             : eventRecord.emplace<FocusEventRecord >(record.Event.FocusEvent           ); break;
+	default: _ASSERT_EXPR(false, "Unreachable"); break;
 	}
-	EventRecord& operator =(const INPUT_RECORD& record)
-	{
-		m_Type = static_cast<EventType>(record.EventType);
-		switch (m_Type)
-		{
-		case EventType::Key:    new (&m_KeyEvent   ) KeyEventRecord   (record.Event.KeyEvent             ); break;
-		case EventType::Mouse:  new (&m_MouseEvent ) MouseEventRecord (record.Event.MouseEvent           ); break;
-		case EventType::Buffer: new (&m_BufferEvent) BufferEventRecord(record.Event.WindowBufferSizeEvent); break;
-		case EventType::Menu:   new (&m_MenuEvent  ) MenuEventRecord  (record.Event.MenuEvent            ); break;
-		case EventType::Focus:  new (&m_FocusEvent ) FocusEventRecord (record.Event.FocusEvent           ); break;
-		default: _ASSERT_EXPR(false, "Unreachable"); break;
-		}
-		return *this;
-	}
-	EventType GetType() const { return m_Type; }
-	const KeyEventRecord* AsKeyEvent() const LVALUE_REF { return m_Type == EventType::Key ? &m_KeyEvent : nullptr; }
-	std::optional<KeyEventRecord> AsKeyEvent() RVALUE_REF 
-	{
-		if (m_Type == EventType::Key)
-			return m_KeyEvent;
-		else
-			return {};
-	}
-	const MouseEventRecord* AsMouseEvent() const LVALUE_REF { return m_Type == EventType::Mouse ? &m_MouseEvent : nullptr; }
-	std::optional<MouseEventRecord> AsMouseEvent() RVALUE_REF 
-	{
-		if (m_Type == EventType::Mouse)
-			return m_MouseEvent;
-		else
-			return {};
-	}
-	const BufferEventRecord* AsBufferEvent() const LVALUE_REF { return m_Type == EventType::Buffer ? &m_BufferEvent : nullptr; }
-	std::optional<BufferEventRecord> AsBufferEvent() RVALUE_REF
-	{
-		if (m_Type == EventType::Buffer)
-			return m_BufferEvent;
-		else
-			return {};
-	}
-	const MenuEventRecord* AsMenuEvent() const LVALUE_REF { return m_Type == EventType::Menu ? &m_MenuEvent : nullptr; }
-	std::optional<MenuEventRecord> AsMenuEvent() RVALUE_REF
-	{
-		if (m_Type == EventType::Menu)
-			return m_MenuEvent;
-		else
-			return {};
-	}
-	const FocusEventRecord* AsFocusEvent() const LVALUE_REF { return m_Type == EventType::Focus ? &m_FocusEvent : nullptr; }
-	std::optional<FocusEventRecord> AsFocusEvent() RVALUE_REF
-	{
-		if (m_Type == EventType::Focus)
-			return m_FocusEvent;
-		else
-			return {};
-	}
-
-private:
-	EventType m_Type;
-	union
-	{
-		KeyEventRecord m_KeyEvent;
-		MouseEventRecord m_MouseEvent;
-		BufferEventRecord m_BufferEvent;
-		MenuEventRecord m_MenuEvent;
-		FocusEventRecord m_FocusEvent;
-	};
-};
+	return eventRecord;
+}
 
 class ConsoleBase abstract
 {
@@ -566,32 +488,26 @@ public:
 		ThrowIfFailed(FillConsoleOutputAttribute(GetHandle(), static_cast<uint16_t>(attribute), length, static_cast<COORD>(coord), &actualLength));
 		return actualLength;
 	}
-	uint32_t WriteOutput(const WCHAR* characters, uint32_t length, ConsoleCoordinate coord)
+	uint32_t WriteOutput(std::wstring_view characters, ConsoleCoordinate coord)
 	{
 		DWORD actualLength;
-		ThrowIfFailed(WriteConsoleOutputCharacterW(GetHandle(), characters, length, static_cast<COORD>(coord), &actualLength));
+		ThrowIfFailed(WriteConsoleOutputCharacterW(GetHandle(), characters.data(), static_cast<DWORD>(characters.size()), static_cast<COORD>(coord), &actualLength));
 		return actualLength;
 	}
-	uint32_t WriteOutput(const WCHAR* characters, ConsoleCoordinate coord) { return WriteOutput(characters, static_cast<uint32_t>(wcslen(characters)), coord); }
-	uint32_t WriteOutput(const std::wstring& characters, size_t offset, uint32_t length, ConsoleCoordinate coord) { return WriteOutput(&characters[offset], length, coord); }
-	uint32_t WriteOutput(const std::wstring& characters, ConsoleCoordinate coord) { return WriteOutput(characters, 0, static_cast<uint32_t>(characters.size()), coord); }
 	template <typename InputIterator> uint32_t WriteOutput(InputIterator attributesBegin, InputIterator attributesEnd, ConsoleCoordinate coord)
 	{
 		std::vector<uint16_t> buffer;
-		std::transform(attributesBegin, attributesEnd, std::back_inserter(buffer), [](const ConsoleCharacterAttribute& attr) { return static_cast<uint16_t>(attr); });
+		std::transform(attributesBegin, attributesEnd, std::back_insert_iterator(buffer), [](const ConsoleCharacterAttribute& attr) { return static_cast<uint16_t>(attr); });
 		DWORD actualLength;
 		ThrowIfFailed(WriteConsoleOutputAttribute(m_Handle, buffer.data(), static_cast<DWORD>(buffer.size()), static_cast<COORD>(coord), &actualLength));
 		return actualLength;
 	}
-	uint32_t Write(const WCHAR* text, uint32_t length)
+	uint32_t Write(std::wstring_view text)
 	{
 		DWORD actualLength;
-		ThrowIfFailed(WriteConsoleW(GetHandle(), text, length, &actualLength, nullptr));
+		ThrowIfFailed(WriteConsoleW(GetHandle(), text.data(), static_cast<DWORD>(text.size()), &actualLength, nullptr));
 		return actualLength;
 	}
-	uint32_t Write(const WCHAR* text) { return Write(text, static_cast<uint32_t>(wcslen(text))); }
-	uint32_t Write(const std::wstring& text, size_t offset, uint32_t length) { return Write(&text[offset], length); }
-	uint32_t Write(const std::wstring& text) { return Write(text, 0, static_cast<uint32_t>(text.size())); }
 
 private:
 	void GetScreenBufferInfo(CONSOLE_SCREEN_BUFFER_INFOEX& value) const
@@ -614,54 +530,31 @@ public:
 		ThrowIfFailed(GetNumberOfConsoleInputEvents(GetHandle(), &numberOfEvents));
 		return numberOfEvents;
 	}
-	template <typename OutputIterator> uint32_t PeekInput(OutputIterator dest, uint32_t length) const
-	{
-		DWORD actualLength;
-		std::vector<INPUT_RECORD> buffer(length);
-		ThrowIfFailed(PeekConsoleInputW(GetHandle(), buffer.data(), length, &actualLength));
-		for (auto&& it : buffer)
-			*dest++ = std::move(it);
-		return actualLength;
-	}
+	uint32_t PeekInput(INPUT_RECORD* buffer, uint32_t length) const { return PeekReadInput(PeekConsoleInputW, GetHandle(), buffer, length); }
 	std::optional<EventRecord> PeekInput() const
 	{
+		INPUT_RECORD inputRecord;
 		std::optional<EventRecord> value;
-		PeekInput(simple_setter(value), 1);
+		if (PeekReadInput(PeekConsoleInputW, GetHandle(), &inputRecord, 1) != 0)
+			value = CreateEventRecord(inputRecord);
 		return value;
 	}
-	std::vector<EventRecord> PeekInput(uint32_t length) const
-	{
-		std::vector<EventRecord> buffer;
-		PeekInput(back_emplacer(buffer), length);
-		buffer.shrink_to_fit();
-		return std::move(buffer);
-	}
-	template <typename OutputIterator> uint32_t ReadInput(OutputIterator dest, uint32_t length)
-	{
-		DWORD actualLength;
-		std::vector<INPUT_RECORD> buffer(length);
-		ThrowIfFailed(ReadConsoleInputW(GetHandle(), buffer.data(), length, &actualLength));
-		for (auto&& it : buffer)
-			*dest++ = std::move(it);
-		return actualLength;
-	}
+	std::vector<EventRecord> PeekInput(uint32_t length) const { return PeekReadInput(PeekConsoleInputW, GetHandle(), length); }
+	uint32_t ReadInput(INPUT_RECORD* buffer, uint32_t length) { return PeekReadInput(ReadConsoleInputW, GetHandle(), buffer, length); }
 	EventRecord ReadInput()
 	{
-		EventRecord record;
-		ReadInput(&record, 1);
-		return record;
+		INPUT_RECORD inputRecord;
+		PeekReadInput(ReadConsoleInputW, GetHandle(), &inputRecord, 1);
+		return CreateEventRecord(inputRecord);
 	}
-	std::vector<EventRecord> ReadInput(uint32_t length)
-	{
-		std::vector<EventRecord> buffer(length);
-		ReadInput(back_emplacer(buffer), length);
-		buffer.shrink_to_fit();
-		return std::move(buffer);
-	}
-	uint32_t Read(std::wstring& buffer, size_t offset, uint32_t length, const std::optional<CONSOLE_READCONSOLE_CONTROL>& control = std::nullopt)
+	std::vector<EventRecord> ReadInput(uint32_t length) { return PeekReadInput(ReadConsoleInputW, GetHandle(), length); }
+	uint32_t Read(WCHAR* buffer, uint32_t length, const std::optional<CONSOLE_READCONSOLE_CONTROL>& control = std::nullopt)
 	{
 		DWORD actualLength;
-		ThrowIfFailed(ReadConsoleW(GetHandle(), &buffer[offset], length, &actualLength, const_cast<CONSOLE_READCONSOLE_CONTROL*>(&*control)));
+		CONSOLE_READCONSOLE_CONTROL* pControl = nullptr;
+		if (control)
+			pControl = const_cast<CONSOLE_READCONSOLE_CONTROL*>(&*control);
+		ThrowIfFailed(ReadConsoleW(GetHandle(), buffer, length, &actualLength, pControl));
 		return actualLength;
 	}
 	std::wstring Read(const std::optional<CONSOLE_READCONSOLE_CONTROL>& control = std::nullopt)
@@ -672,7 +565,7 @@ public:
 		while (true)
 		{
 			buffer.resize(charsReadSoFar + charsToRead);
-			const auto charsRead = Read(buffer, charsReadSoFar, charsToRead, control);
+			const auto charsRead = Read(buffer.data() + charsReadSoFar, charsToRead, control);
 			charsReadSoFar += charsRead;
 			if (charsRead < charsToRead) break;
 		}
@@ -687,5 +580,23 @@ public:
 		DWORD numberOfMouseButtons;
 		ThrowIfFailed(GetNumberOfConsoleMouseButtons(&numberOfMouseButtons));
 		return numberOfMouseButtons;
+	}
+
+private:
+	using PeekReadFunc = BOOL(WINAPI *)(HANDLE, PINPUT_RECORD, DWORD, LPDWORD);
+
+	static uint32_t PeekReadInput(PeekReadFunc func, HANDLE handle, INPUT_RECORD* buffer, uint32_t length)
+	{
+		DWORD actualLength;
+		ThrowIfFailed(func(handle, buffer, length, &actualLength));
+		return actualLength;
+	}
+	static std::vector<EventRecord> PeekReadInput(PeekReadFunc func, HANDLE handle, uint32_t length)
+	{
+		std::vector<INPUT_RECORD> buffer(length);
+		auto actualLength = PeekReadInput(func, handle, buffer.data(), length);
+		std::vector<EventRecord> records(actualLength);
+		std::transform(buffer.cbegin(), buffer.cbegin() + actualLength, records.begin(), CreateEventRecord);
+		return records;
 	}
 };

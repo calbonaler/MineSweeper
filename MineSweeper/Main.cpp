@@ -1,7 +1,10 @@
-﻿#include <iostream>
+﻿#include <array>
+#include <iostream>
+#include <queue>
 #include <string>
 #include <functional>
 #include <random>
+#include <ranges>
 #include "Console.h"
 
 constexpr ConsoleColor DefaultBackground = ConsoleColor::Silver;
@@ -9,157 +12,267 @@ constexpr ConsoleColor DefaultForeground = ConsoleColor::Black;
 
 struct Vector
 {
-	Vector() : X(0), Y(0) {}
-	Vector(ptrdiff_t x, ptrdiff_t y) : X(x), Y(y) { }
+	constexpr Vector() : X(0), Y(0) {}
+	constexpr Vector(int32_t x, int32_t y) : X(x), Y(y) { }
 
-	ptrdiff_t X;
-	ptrdiff_t Y;
+	int32_t X;
+	int32_t Y;
 
-	bool operator ==(const Vector& right) const { return X == right.X && Y == right.Y; }
-	bool operator !=(const Vector& right) const { return !(*this == right); }
-};
-
-struct Location
-{
-public:
-	Location() : X(0), Y(0) { }
-	Location(size_t x, size_t y) : X(x), Y(y) { }
-
-	size_t X;
-	size_t Y;
-
-	Location& operator +=(const Vector& right)
+	constexpr bool operator ==(const Vector& right) const { return X == right.X && Y == right.Y; }
+	constexpr bool operator !=(const Vector& right) const { return !(*this == right); }
+	constexpr Vector& operator +=(const Vector& right)
 	{
 		X += right.X;
 		Y += right.Y;
 		return *this;
 	}
-	Location operator +(const Vector& right) const { return Location(*this) += right; }
-	Location& operator -=(const Vector& right)
+	constexpr Vector operator +(const Vector& right) const { return Vector(*this) += right; }
+	constexpr Vector& operator -=(const Vector& right)
 	{
 		X -= right.X;
 		Y -= right.Y;
 		return *this;
 	}
-	Location operator -(const Vector& right) const { return Location(*this) -= right; }
-	Vector operator -(const Location& right) const { return Vector(SafeSubtract(X, right.X), SafeSubtract(Y, right.Y)); }
-	bool operator ==(const Location& right) const { return X == right.X && Y == right.Y; }
-	bool operator !=(const Location& right) const { return !(*this == right); }
+	constexpr Vector operator -(const Vector& right) const { return Vector(*this) -= right; }
+	constexpr Vector operator +() const { return *this; }
+	constexpr Vector operator -() const { return { -X, -Y }; }
+};
+
+struct Size
+{
+	constexpr Size() : Width(0), Height(0) {}
+	constexpr Size(uint32_t width, uint32_t height) : Width(width), Height(height) {}
+	explicit Size(const Vector& vector) : Width(static_cast<uint32_t>(abs(vector.X))), Height(static_cast<uint32_t>(abs(vector.Y))) {}
+	
+	uint32_t Width;
+	uint32_t Height;
+
+	constexpr bool operator ==(const Size& right) const { return Width == right.Width && Height == right.Height; }
+	constexpr bool operator !=(const Size& right) const { return !(*this == right); }
+	constexpr explicit operator Vector() const { return Vector(static_cast<int32_t>(Width), static_cast<int32_t>(Height)); }
+};
+
+struct Point
+{
+public:
+	constexpr Point() : X(0), Y(0) { }
+	constexpr Point(uint32_t x, uint32_t y) : X(x), Y(y) { }
+
+	uint32_t X;
+	uint32_t Y;
+
+	constexpr Point& operator +=(const Vector& right)
+	{
+		X += right.X;
+		Y += right.Y;
+		return *this;
+	}
+	constexpr Point operator +(const Vector& right) const { return Point(*this) += right; }
+	constexpr Point& operator -=(const Vector& right)
+	{
+		X -= right.X;
+		Y -= right.Y;
+		return *this;
+	}
+	constexpr Point operator -(const Vector& right) const { return Point(*this) -= right; }
+	constexpr Vector operator -(const Point& right) const { return Vector(SafeSubtract(X, right.X), SafeSubtract(Y, right.Y)); }
+	constexpr bool operator ==(const Point& right) const { return X == right.X && Y == right.Y; }
+	constexpr bool operator !=(const Point& right) const { return !(*this == right); }
+
+	constexpr bool IsContainedIn(const Size& size) const { return X < size.Width&& Y < size.Height; }
 
 private:
-	static inline ptrdiff_t SafeSubtract(size_t left, size_t right)
+	constexpr static int32_t SafeSubtract(uint32_t left, uint32_t right)
 	{
 		return left >= right ?
-			static_cast<ptrdiff_t>(left - right) :
-			-static_cast<ptrdiff_t>(right - left);
+			static_cast<int32_t>(left - right) :
+			-static_cast<int32_t>(right - left);
 	}
 };
 
-inline Location operator +(const Vector& left, const Location& right) { return right + left; }
+constexpr inline Point operator +(const Vector& left, const Point& right) { return right + left; }
+
+enum class GameProgress
+{
+	InProgress = 0,
+	Completed = 1,
+	Failed = 2,
+};
+
+class AllPointView : public std::ranges::view_interface<AllPointView>
+{
+public:
+	class Sentinel {};
+	class Iterator
+	{
+	public:
+		constexpr Iterator(const Size& size) : m_Size(size), m_Value() {}
+		constexpr Iterator& operator ++() { m_Value = m_Value.X >= m_Size.Width - 1 ? Point(0, m_Value.Y + 1) : Point(m_Value.X + 1, m_Value.Y); return *this; }
+		constexpr void operator ++(int) { operator ++(); }
+		constexpr const Point& operator *() const { return m_Value; }
+		constexpr bool operator ==(Sentinel) const { return !m_Value.IsContainedIn(m_Size); }
+
+		using difference_type = ptrdiff_t;
+		using value_type = Point;
+	private:
+		Point m_Value;
+		Size m_Size;
+	};
+
+	constexpr AllPointView(const Size& size) : m_Size(size) {}
+	constexpr Iterator begin() const { return Iterator(m_Size); }
+	constexpr Sentinel end() const { return {}; }
+
+private:
+	Size m_Size;
+};
+
+template <>
+static inline constexpr bool std::ranges::enable_borrowed_range<AllPointView> = true;
+
+class AroundPointView : public std::ranges::view_interface<AroundPointView>
+{
+public:
+	class Sentinel {};
+	class Iterator
+	{
+	public:
+		constexpr Iterator(const Point& center, const Size& size) : m_Center(center), m_Size(size), m_Index(static_cast<uint32_t>(-1)) { operator ++(); }
+		constexpr Iterator& operator ++()
+		{
+			do
+				m_Index++;
+			while (m_Index < End && (m_Index == Skip || !operator *().IsContainedIn(m_Size)));
+			return *this;
+		}
+		constexpr void operator ++(int) { operator ++(); }
+		constexpr Point operator *() const { return m_Center + Vector(m_Index % 3 - 1, m_Index / 3 - 1); }
+		constexpr bool operator ==(Sentinel) const { return m_Index == End; }
+
+		using difference_type = int32_t;
+		using value_type = Point;
+
+	private:
+		constexpr static uint32_t Skip = 4;
+		constexpr static uint32_t End = 9;
+		Point m_Center;
+		Size m_Size;
+		uint32_t m_Index;
+	};
+
+	constexpr AroundPointView(const Point& center, const Size& size) : m_Center(center), m_Size(size) {}
+	constexpr Iterator begin() const { return Iterator(m_Center, m_Size); }
+	constexpr Sentinel end() const { return {}; }
+
+private:
+	Point m_Center;
+	Size m_Size;
+};
+
+template <>
+static inline constexpr bool std::ranges::enable_borrowed_range<AroundPointView> = true;
 
 class Game
 {
 public:
-	Game(size_t width, size_t height, size_t mines) : table(width, height), mines(mines), minesInitialized(false) { }
-	Game(const Game&) = delete;
-	Game(Game&&) = delete;
-	Game& operator =(const Game&) = delete;
-	Game& operator =(Game&&) = delete;
+	Game(const Size& size, uint32_t mines) : m_Cells(std::make_unique<Cell[]>(static_cast<size_t>(size.Width) * size.Height)), m_Size(size), m_MinesToBePlaced(mines), m_ShouldRender(true) { }
 
-	static Location GetLocationForCoordinate(ConsoleCoordinate coordinate) { return { static_cast<size_t>(coordinate.X / 2), static_cast<size_t>(coordinate.Y) }; }
-
-	void Render(OutputConsole& output) const
+	std::optional<Point> CoordinateToLocation(ConsoleCoordinate coordinate) const
 	{
-		for (size_t y = 0; y < table.Height(); y++)
+		Point loc(static_cast<uint32_t>(coordinate.X / 2), static_cast<uint32_t>(coordinate.Y));
+		if (loc.IsContainedIn(m_Size))
+			return { loc };
+		else
+			return std::nullopt;
+	}
+	constexpr bool ShouldRender() const { return m_ShouldRender; }
+	void Render(OutputConsole& output)
+	{
+		output.SetCursorPosition({ 0, 0 });
+		for (uint32_t i = 0; i < m_Size.Height; i++)
 		{
-			for (size_t x = 0; x < table.Width(); x++)
-				table(x, y).Render(output);
+			for (uint32_t j = 0; j < m_Size.Width; j++)
+				CellAt(j, i).Render(output, m_OpeningPosition && IsAround(Point(j, i), *m_OpeningPosition));
 			output.Write(L"\n");
 		}
+		output.FillOutput(L' ', output.GetScreenBufferSize().Width, output.GetCursorPosition());
+		output.Write(L"残り地雷数: " + std::to_wstring(CountUnflaggedMines()));
+		m_ShouldRender = false;
 	}
-	bool OpenCell(const Location& loc)
+	void OpenCell(const Point& loc)
 	{
-		if (table(loc).State == CellState::Flagged || table(loc).State == CellState::Open)
-			return true;
-		if (!minesInitialized)
+		std::queue<Point> searchLocations;
+		searchLocations.emplace(loc);
+		while (!searchLocations.empty())
 		{
-			SetMines(loc);
-			minesInitialized = true;
+			Point loc = searchLocations.front();
+			searchLocations.pop();
+			if (CellAt(loc).State == CellState::Flagged || CellAt(loc).State == CellState::Open)
+				continue;
+			if (m_MinesToBePlaced > 0)
+			{
+				PlaceMines(m_MinesToBePlaced, loc);
+				m_MinesToBePlaced = 0;
+			}
+			CellAt(loc).State = CellState::Open;
+			m_ShouldRender = true;
+			if (CellAt(loc).HasMine)
+			{
+				OpenAllMines();
+				continue;
+			}
+			if (CellAt(loc).AroundMines > 0)
+				continue;
+			for (auto pos : AroundPointView(loc, m_Size))
+				searchLocations.emplace(pos);
 		}
-		table(loc).State = CellState::Open;
-		if (table(loc).HasMine)
-		{
-			OpenAllMines();
-			return false;
-		}
-		if (table(loc).AroundMines > 0)
-			return true;
-		table.Around(loc, [this](const Location& loc) { OpenCell(loc); });
-		return true;
 	}
-	bool OpenCellsWithCurrentMineIndicator(const Location& loc)
+	constexpr void OpenCellsWithMineIndicator(const Point& loc)
 	{
-		if (table(loc).State != CellState::Open)
-			return true;
+		if (CellAt(loc).State != CellState::Open)
+			return;
 		size_t allArounds = 0;
-		std::vector<Location> locs;
-		table.Around(loc, [this, &allArounds, &locs](const Location& loc)
+		std::vector<Point> locs;
+		for (auto pos : AroundPointView(loc, m_Size))
 		{
-			if (table(loc).State != CellState::Flagged)
-				locs.emplace_back(loc);
+			if (CellAt(pos).State != CellState::Flagged)
+				locs.emplace_back(pos);
 			allArounds++;
-		});
-		if (locs.size() != allArounds - table(loc).AroundMines)
-			return true;
+		}
+		if (locs.size() != allArounds - CellAt(loc).AroundMines)
+			return;
 		for (const auto& it : locs)
+			OpenCell(it);
+	}
+	constexpr void SwitchFlaggedState(const Point& loc) { m_ShouldRender |= CellAt(loc).SwitchFlaggedState(); }
+	constexpr void SetCellOpening(const Point& loc)
+	{
+		ClearCellOpening();
+		m_OpeningPosition = loc;
+		m_ShouldRender |= true;
+	}
+	constexpr void ClearCellOpening()
+	{
+		m_OpeningPosition = std::nullopt;
+		m_ShouldRender |= true;
+	}
+	constexpr bool IsOpeningAnyCell() const { return m_OpeningPosition.has_value(); }
+	constexpr GameProgress GetProgress() const
+	{
+		GameProgress result = GameProgress::Completed;
+		for (const auto& cell : Cells())
 		{
-			if (!OpenCell(it))
-				return false;
+			// 地雷があるが開かれていた（地雷がある場合は即時returnする）
+			if (cell.HasMine && cell.State == CellState::Open)
+				return GameProgress::Failed;
+			// 地雷がないのに開かれていない（以降のセルで地雷が開かれている可能性があるため即時returnはしない）
+			if (!cell.HasMine && cell.State != CellState::Open)
+				result = GameProgress::InProgress;
+			// 下記は完了の可能性があるので判定を継続する
+			// * 地雷があって開かれていない
+			// * 地雷がなくて開かれている
 		}
-		return true;
-	}
-	void SwitchFlaggedState(const Location& loc)
-	{
-		if (table(loc).State == CellState::Closed)
-			table(loc).State = CellState::Flagged;
-		else if (table(loc).State == CellState::Flagged)
-			table(loc).State = CellState::Closed;
-	}
-	void SetCellOpeningState(const Location& loc, bool opening)
-	{
-		table.Around(loc, [this, opening](const Location& loc)
-		{
-			if (opening)
-			{
-				if (table(loc).State == CellState::Closed)
-					table(loc).State = CellState::Opening;
-			}
-			else
-			{
-				if (table(loc).State == CellState::Opening)
-					table(loc).State = CellState::Closed;
-			}
-		});
-	}
-	bool IsValidLocation(const Location& loc) const { return table.IsValidLocation(loc); }
-	bool HasCompleted() const
-	{
-		for (Location loc; IsValidLocation(loc); loc = table.GetNextLocation(loc))
-		{
-			if (!table(loc).HasMine && table(loc).State != CellState::Open)
-				return false;
-		}
-		return true;
-	}
-	ptrdiff_t CountUnflaggedMines() const
-	{
-		ptrdiff_t allMines = static_cast<ptrdiff_t>(mines);
-		for (Location loc; IsValidLocation(loc); loc = table.GetNextLocation(loc))
-		{
-			if (table(loc).State == CellState::Flagged)
-				--allMines;
-		}
-		return allMines;
+		return result;
 	}
 
 private:
@@ -167,29 +280,28 @@ private:
 	{
 		Closed = 0,
 		Flagged = 1,
-		Opening = 2,
-		Open = 3,
+		Open = 2,
 	};
 
 	class Cell
 	{
 	public:
-		Cell() : AroundMines(0), HasMine(false), State(CellState::Closed) { }
+		constexpr Cell() : AroundMines(0), HasMine(false), State(CellState::Closed) { }
 		uint8_t AroundMines : 5;
 		uint8_t HasMine : 1;
 		CellState State : 2;
 
-		void Render(OutputConsole& output) const
+		void Render(OutputConsole& output, bool opening) const
 		{
 			if (State == CellState::Flagged)
 			{
-				output.SetTextAttribute({ ConsoleColor::Red, DefaultBackground });
-				output.Write(L"★");
+				output.SetTextAttribute({ ConsoleColor::Purple, DefaultBackground });
+				output.Write(L"■");
 				output.SetTextAttribute({ DefaultForeground, DefaultBackground });
 			}
 			else if (State != CellState::Open)
 			{
-				output.SetTextAttribute({ State == CellState::Opening ? ConsoleColor::Black : ConsoleColor::Gray, DefaultBackground });
+				output.SetTextAttribute({ opening ? ConsoleColor::Black : ConsoleColor::Gray, DefaultBackground });
 				output.Write(L"■");
 				output.SetTextAttribute({ DefaultForeground, DefaultBackground });
 			}
@@ -201,11 +313,27 @@ private:
 			{
 				output.SetTextAttribute({ GetColor(AroundMines), DefaultBackground });
 				auto ch = static_cast<WCHAR>(L'０' + AroundMines);
-				output.Write(&ch, 1);
+				output.Write(std::wstring_view(&ch, 1));
 				output.SetTextAttribute({ DefaultForeground, DefaultBackground });
 			}
 		}
-		static ConsoleColor GetColor(int value)
+		constexpr bool SwitchFlaggedState()
+		{
+			if (State == CellState::Closed)
+			{
+				State = CellState::Flagged;
+				return true;
+			}
+			else if (State == CellState::Flagged)
+			{
+				State = CellState::Closed;
+				return true;
+			}
+			return false;
+		}
+
+	private:
+		constexpr static ConsoleColor GetColor(int value)
 		{
 			switch (value)
 			{
@@ -219,152 +347,153 @@ private:
 		}
 	};
 
-	class Table
+	constexpr Cell& CellAt(uint32_t x, uint32_t y) { return m_Cells[static_cast<size_t>(y) * m_Size.Width + x]; }
+	constexpr const Cell& CellAt(uint32_t x, uint32_t y) const { return m_Cells[static_cast<size_t>(y) * m_Size.Width + x]; }
+	constexpr Cell& CellAt(const Point& loc) { return CellAt(loc.X, loc.Y); }
+	constexpr const Cell& CellAt(const Point& loc) const { return CellAt(loc.X, loc.Y); }
+	constexpr std::span<Cell> Cells() { return std::span<Cell>(m_Cells.get(), static_cast<size_t>(m_Size.Width) * m_Size.Height); }
+	constexpr std::span<const Cell> Cells() const { return std::span<Cell>(m_Cells.get(), static_cast<size_t>(m_Size.Width) * m_Size.Height); }
+
+	void PlaceMines(uint32_t mines, const Point& without)
 	{
-	public:
-		Table(size_t width, size_t height) : cells(height, std::vector<Cell>(width)) { }
-		Table(const Table&) = delete;
-		Table(Table&&) = delete;
-		Table& operator =(const Table&) = delete;
-		Table& operator =(Table&&) = delete;
-
-		Cell& operator()(size_t x, size_t y) { return cells[y][x]; }
-		const Cell& operator()(size_t x, size_t y) const { return cells[y][x]; }
-		Cell& operator()(const Location& loc) { return (*this)(loc.X, loc.Y); }
-		const Cell& operator()(const Location& loc) const { return (*this)(loc.X, loc.Y); }
-
-		size_t Width() const { return cells[0].size(); }
-		size_t Height() const { return cells.size(); }
-
-		Location GetNextLocation(const Location& loc) const { return loc.X >= cells[0].size() - 1 ? Location(0, loc.Y + 1) : Location(loc.X + 1, loc.Y); }
-		bool IsValidLocation(const Location& loc) const { return loc.X < cells[0].size() && loc.Y < cells.size(); }
-		template <typename T> void Around(const Location& loc, T func) const
-		{
-			for (ptrdiff_t dx = -1; dx <= 1; dx++)
-			{
-				for (ptrdiff_t dy = -1; dy <= 1; dy++)
-				{
-					if (dx == 0 && dy == 0)
-						continue;
-					auto moved = loc + Vector(dx, dy);
-					if (!IsValidLocation(moved))
-						continue;
-					func(moved);
-				}
-			}
-		}
-		template <typename TEngine> Location GenerateLocation(TEngine& engine) { return Location(std::uniform_int<size_t>(0, cells[0].size() - 1)(engine), std::uniform_int<size_t>(0, cells.size() - 1)(engine)); }
-
-	private:
-		std::vector<std::vector<Cell>> cells;
-	};
-
-	Table table;
-	size_t mines;
-	bool minesInitialized;
-
-	void SetMines(const Location& without)
-	{
-		std::array<std::seed_seq::result_type, std::mt19937::state_size> seed_data;
+		std::array<std::seed_seq::result_type, std::mt19937::state_size> seed_data{};
 		std::random_device rnd;
 		std::generate(seed_data.begin(), seed_data.end(), std::ref(rnd));
 		std::seed_seq seq(seed_data.cbegin(), seed_data.cend());
 		std::mt19937 rng(seq);
-		for (size_t i = 0; i < mines; )
+		for (uint32_t i = 0; i < mines; )
 		{
-			auto loc = table.GenerateLocation(rng);
-			if (without == loc || table(loc).HasMine)
+			auto loc = GenerateLocation(rng);
+			bool matches = false;
+			if (mines <= m_Size.Width * m_Size.Height - 9)
+				matches |= IsAround(loc, without);
+			if (without == loc || matches || CellAt(loc).HasMine)
 				continue;
-			table(loc).HasMine = true;
+			CellAt(loc).HasMine = true;
 			i++;
 		}
-		for (Location loc; IsValidLocation(loc); loc = table.GetNextLocation(loc))
-			table(loc).AroundMines = CountMines(loc);
+		for (const auto& loc : AllPointView(m_Size))
+			CellAt(loc).AroundMines = std::ranges::count_if(AroundPointView(loc, m_Size), [this](auto x) { return CellAt(x).HasMine; });
 	}
-	int CountMines(const Location& center) const
+	constexpr void OpenAllMines()
 	{
-		int mines = 0;
-		table.Around(center, [this, &mines](const Location& moved) { if (table(moved).HasMine) mines++; });
-		return mines;
-	}
-	void OpenAllMines()
-	{
-		for (Location loc; table.IsValidLocation(loc); loc = table.GetNextLocation(loc))
+		for (auto& cell : Cells())
 		{
-			if (table(loc).HasMine)
-				table(loc).State = CellState::Open;
+			if (cell.HasMine)
+				cell.State = CellState::Open;
 		}
 	}
+	constexpr int32_t CountUnflaggedMines() const
+	{
+		int32_t mines = 0;
+		int32_t flags = 0;
+		for (const auto& cell : Cells())
+		{
+			if (cell.HasMine)
+				mines++;
+			if (cell.State == CellState::Flagged)
+				flags++;
+		}
+		return m_MinesToBePlaced + mines - flags;
+	}
+
+	template <typename TEngine> Point GenerateLocation(TEngine& engine) { return Point(std::uniform_int<uint32_t>(0, m_Size.Width - 1)(engine), std::uniform_int<uint32_t>(0, m_Size.Height - 1)(engine)); }
+
+	constexpr bool IsAround(const Point& loc, const Point& center) { return std::ranges::contains(AroundPointView(center, m_Size), loc); }
+
+	std::unique_ptr<Cell[]> m_Cells;
+	Size m_Size;
+	uint32_t m_MinesToBePlaced;
+	std::optional<Point> m_OpeningPosition;
+	bool m_ShouldRender;
 };
 
-bool PlayGame(size_t width, size_t height, size_t mines, InputConsole& input, OutputConsole& output, ConsoleSize bufferSize)
+bool PlayGame(const Size& size, uint32_t mines, InputConsole& input, OutputConsole& output)
 {
-	Game game(width, height, mines);
+	Game game(size, mines);
 	std::optional<MouseButtonState> prevButtonState;
-	std::optional<Location> openingCenterPos;
-	bool renderRequested = true;
-	bool canOpenCell = false;
-	bool res = true;
 	while (true)
 	{
-		if (renderRequested)
+		if (game.ShouldRender())
 		{
-			output.SetCursorPosition({ 0, 0 });
 			game.Render(output);
-			output.FillOutput(L' ', bufferSize.Width, output.GetCursorPosition());
-			output.Write(L"残り地雷数: " + std::to_wstring(game.CountUnflaggedMines()));
-			if (!res)
-				return false;
-			if (game.HasCompleted())
-				return true;
-			renderRequested = false;
+			switch (game.GetProgress())
+			{
+			case GameProgress::Failed   : return false;
+			case GameProgress::Completed: return true;
+			}
 		}
-		const auto ev = input.ReadInput().AsMouseEvent();
+		const auto eventRecord = input.ReadInput();
+		const auto ev = std::get_if<MouseEventRecord>(&eventRecord);
 		if (!ev) continue;
-		auto loc = Game::GetLocationForCoordinate(ev->Location);
-		if (prevButtonState && game.IsValidLocation(loc))
+		auto loc = game.CoordinateToLocation(ev->Location);
+		if (prevButtonState && loc)
 		{
+			// 左右両ボタン押下→少なくとも左右いずれのボタンが非押下
 			if (prevButtonState->GetLeft() && prevButtonState->GetRight() && (!ev->ButtonState.GetLeft() || !ev->ButtonState.GetRight()))
 			{
-				if (openingCenterPos)
-				{
-					game.SetCellOpeningState(*openingCenterPos, false);
-					openingCenterPos = std::nullopt;
-				}
-				res = game.OpenCellsWithCurrentMineIndicator(loc);
-				renderRequested = true;
-				canOpenCell = false;
+				game.ClearCellOpening();
+				game.OpenCellsWithMineIndicator(*loc);
 			}
-			if (canOpenCell && prevButtonState->GetLeft() && !prevButtonState->GetRight() && !ev->ButtonState.GetLeft() && !ev->ButtonState.GetRight())
-			{
-				res = game.OpenCell(loc);
-				renderRequested = true;
-				canOpenCell = false;
-			}
-			if (!prevButtonState->GetLeft() && !prevButtonState->GetRight() && !ev->ButtonState.GetLeft() && ev->ButtonState.GetRight())
-			{
-				game.SwitchFlaggedState(loc);
-				res = true;
-				renderRequested = true;
-			}
-			if (!prevButtonState->GetLeft() && !prevButtonState->GetRight() && ev->ButtonState.GetLeft() && !ev->ButtonState.GetRight())
-				canOpenCell = true;
+			// 左ボタンのみ押下→左右両ボタン非押下
+			if (prevButtonState->GetLeft() && !prevButtonState->GetRight() && !ev->ButtonState.GetLeft() && !ev->ButtonState.GetRight())
+				game.OpenCell(*loc);
+			// 右ボタンのみ押下→左右両ボタン非押下
+			if (!prevButtonState->GetLeft() && prevButtonState->GetRight() && !ev->ButtonState.GetLeft() && !ev->ButtonState.GetRight())
+				game.SwitchFlaggedState(*loc);
+			// 少なくとも左右いずれかのボタンが非押下→左右両ボタン押下
 			if ((!prevButtonState->GetLeft() || !prevButtonState->GetRight()) && ev->ButtonState.GetLeft() && ev->ButtonState.GetRight())
-			{
-				openingCenterPos = loc;
-				game.SetCellOpeningState(loc, true);
-				renderRequested = true;
-			}
-			if (ev->Kind == MouseEventKind::Moved && openingCenterPos && *openingCenterPos != loc)
-			{
-				game.SetCellOpeningState(*openingCenterPos, false);
-				openingCenterPos = loc;
-				game.SetCellOpeningState(loc, true);
-				renderRequested = true;
-			}
+				game.SetCellOpening(*loc);
+			if (game.IsOpeningAnyCell() && ev->Kind == MouseEventKind::Moved)
+				game.SetCellOpening(*loc);
 		}
 		prevButtonState = ev->ButtonState;
 	}
+}
+
+long InputLongValue(InputConsole& input, OutputConsole& output, std::wstring_view valueName, long minValue, long maxValue)
+{
+	auto initialAttribute = output.GetTextAttribute();
+	long value;
+	while (true)
+	{
+		output.Write(valueName);
+		output.Write(L": ");
+		try
+		{
+			value = std::stol(input.Read());
+		}
+		catch (...)
+		{
+			output.SetTextAttribute({ ConsoleColor::Red, initialAttribute.Background });
+			output.Write(valueName);
+			output.Write(L"を数値で入力してください。\n");
+			output.SetTextAttribute(initialAttribute);
+			continue;
+		}
+		if (value < minValue)
+		{
+			output.SetTextAttribute({ ConsoleColor::Red, initialAttribute.Background });
+			output.Write(valueName);
+			output.Write(L"は");
+			output.Write(std::to_wstring(minValue));
+			output.Write(L"以上の値を入力してください。\n");
+			output.SetTextAttribute(initialAttribute);
+			continue;
+		}
+		if (value > maxValue)
+		{
+			output.SetTextAttribute({ ConsoleColor::Red, initialAttribute.Background });
+			output.Write(valueName);
+			output.Write(L"は");
+			output.Write(std::to_wstring(maxValue));
+			output.Write(L"以下の値を入力してください。\n");
+			output.SetTextAttribute(initialAttribute);
+			continue;
+		}
+		return value;
+	}
+
 }
 
 int main()
@@ -372,27 +501,18 @@ int main()
 	InputConsole input;
 	OutputConsole output;
 	const auto initialAttribute = output.GetTextAttribute();
-	input.SetMode(input.GetMode() | ConsoleInputModes::EnableMouseInput);
+	input.SetMode((input.GetMode() & ~ConsoleInputModes::EnableQuickEditMode) | ConsoleInputModes::EnableMouseInput);
 
 	bool enterConfiguration = true;
-	unsigned long width, height, mines;
+	Size size;
+	long mines;
 	while (true)
 	{
 		if (enterConfiguration)
 		{
-			output.Write(L"幅: ");
-			width = std::stoul(input.Read());
-			output.Write(L"高さ: ");
-			height = std::stoul(input.Read());
-			while (true)
-			{
-				output.Write(L"地雷数: ");
-				mines = std::stoul(input.Read());
-				if (mines < width * height) break;
-				output.SetTextAttribute({ ConsoleColor::Red, initialAttribute.Background });
-				output.Write(L"地雷数は幅×高さよりも小さくなければなりません。\n");
-				output.SetTextAttribute(initialAttribute);
-			}
+			size.Width = InputLongValue(input, output, L"幅", 1, 60);
+			size.Height = InputLongValue(input, output, L"高さ", 1, 40);
+			mines = InputLongValue(input, output, L"地雷数", 0, size.Width * size.Height - 1);
 		}
 
 		output.SetCursorPosition({ 0, 0 });
@@ -406,9 +526,9 @@ int main()
 		newFontInfo.Size.Width = 20;
 		newFontInfo.Size.Height = 40;
 		output.SetCurrentFont(false, newFontInfo);
-		output.SetWindowBounds(true, { 0, 0, static_cast<int16_t>(width * 2 - 1), static_cast<int16_t>(height + 1 - 1) });
+		output.SetWindowBounds(true, { 0, 0, static_cast<int16_t>(size.Width * 2 - 1), static_cast<int16_t>(size.Height + 1 - 1) });
 
-		bool result = PlayGame(width, height, mines, input, output, bufferSize);
+		bool result = PlayGame(size, mines, input, output);
 
 		output.SetCurrentFont(false, initialFontInfo);
 		output.SetWindowBounds(true, intialWindowBounds);
@@ -416,7 +536,6 @@ int main()
 		auto pos = output.GetCursorPosition();
 		pos.X = 0;
 		output.FillOutput(initialAttribute, (bufferSize.Height - pos.Y) * bufferSize.Width, pos);
-		output.SetTextAttribute(initialAttribute);
 
 		if (result)
 		{
@@ -434,7 +553,8 @@ int main()
 		output.Write(L"もう一度プレイする場合は [R] を、設定を変更してプレイする場合は [Shift] + [R] を、終了する場合は [Q] を押してください\n");
 		while (true)
 		{
-			auto ev = input.ReadInput().AsKeyEvent();
+			auto eventRecord = input.ReadInput();
+			auto ev = std::get_if<KeyEventRecord>(&eventRecord);
 			if (!ev) continue;
 			if (ev->Char == 'r')
 			{
